@@ -1,0 +1,55 @@
+# 公共配置文件
+# @author <a href="https://github.com/SamulAlen">程序员艾伦</a>
+#
+spring:
+  application:
+    name: microde-backend
+  # DataSource Config
+  datasource:
+    driver-class-name: com.mysql.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/yupi?serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+  # session 失效时间
+  session:
+    timeout: 86400
+    store-type: redis #默认是 none，表示存储在单台服务器;表示从 redis 读写 session
+    redis:
+      namespace: "spring:session"
+      database: 0  # Spring Session使用的Redis database
+  # Redis 配置
+  redis:
+    port: 6379
+    host: localhost
+    database: 0
+  mvc:
+    pathmatch:
+      matching-strategy: ANT_PATH_MATCHER
+  profiles:
+    active: dev
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+#    session:
+#      cookie:
+#        domain: #配置域名
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: false
+    # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # SQL日志已关闭
+  global-config:
+    db-config:
+      logic-delete-field: isDelete # 全局逻辑删除的实体字段名(since 3.3.0,配置后可以忽略不配置步骤2)
+      logic-delete-value: 1 # 逻辑已删除值(默认为 1)
+      logic-not-delete-value: 0 # 逻辑未删除值(默认为 0)
+
+# Knife4j 配置
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+    swagger-model-name: 实体类列表
+  production: false  # 关闭生产环境访问
+
+# [编程导航学习圈](https://t.zsxq.com/0emozsIJh) 连接万名编程爱好者，一起优秀！20000+ 小伙伴交流分享、40+ 大厂嘉宾一对一答疑、4000+ 编程问答参考、100+ 各方向编程交流群

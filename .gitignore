@@ -1,0 +1,77 @@
+# ===================== 通用忽略项（前后端共用） =====================
+# 编辑器/IDE 配置
+.idea/
+*.iml
+*.iws
+*.ipr
+# 完整忽略 VSCode 所有配置（包含缓存、插件等）
+.vscode/
+# Claude 相关配置/缓存
+.claude/
+# 系统文件
+.DS_Store       # Mac
+Thumbs.db       # Windows
+desktop.ini     # Windows
+# 日志文件
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+# 临时文件
+tmp/
+temp/
+*.tmp
+*.bak
+# 压缩包
+*.zip
+*.tar.gz
+*.rar
+
+# ===================== SpringBoot 后端专属忽略项 =====================
+# Maven 编译输出
+target/
+# Gradle 相关（可选，若用 Gradle 则保留）
+build/
+.gradle/
+# 本地配置文件（避免上传环境敏感配置）
+src/main/resources/application-*.yml
+src/main/resources/application-*.properties
+# IDE 运行配置
+out/
+
+# ===================== React+Ant Design Pro+Umi 前端专属忽略项 =====================
+# 前端依赖包
+node_modules/
+# Umi 构建/缓存目录
+dist/
+.umi/
+.umi-production/
+.umi-test/
+umi-dist/
+# Umi 类型文件缓存
+typings/.umi.d.ts
+# Ant Design Pro 本地配置
+config/local.ts
+# Pro 图标缓存
+src/assets/icons/.DS_Store
+# Pro 打包分析文件
+stats.html
+stats.json
+# 前端工具缓存
+.eslintcache
+.prettiercache
+webpack.cache/
+# 测试覆盖率
+coverage/
+# 环境变量文件（前端敏感配置）
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+# npm/yarn/pnpm 锁文件（可选：团队统一工具后，注释掉不需要的）
+# package-lock.json  # 用 npm 则注释掉这行
+# yarn.lock          # 用 yarn 则注释掉这行
+# pnpm-lock.yaml     # 用 pnpm 则注释掉这行
