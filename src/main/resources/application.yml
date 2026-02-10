@@ -53,3 +53,41 @@ knife4j:
   production: false  # 关闭生产环境访问
 
 # [编程导航学习圈](https://t.zsxq.com/0emozsIJh) 连接万名编程爱好者，一起优秀！20000+ 小伙伴交流分享、40+ 大厂嘉宾一对一答疑、4000+ 编程问答参考、100+ 各方向编程交流群
+
+# 定时任务配置
+scheduled:
+  tasks:
+    # ========== 缓存同步任务 ==========
+    # 缓存同步任务执行间隔（毫秒，默认: 5分钟 = 300000ms）
+    cache-sync-interval: 300000
+    # 是否启用缓存同步任务
+    cache-sync-enabled: true
+
+    # ========== 预计算任务 ==========
+    # 全量预计算任务 cron 表达式 (默认: 每天凌晨 2:00:00)
+    full-precompute-cron: "0 0 2 * * ?"
+    # 增量预计算任务 cron 表达式 (默认: 每6小时一次)
+    incremental-precompute-cron: "0 0 */6 * * ?"
+    # 活跃度预计算任务 cron 表达式 (默认: 每小时一次)
+    activity-precompute-cron: "0 0 * * * ?"
+    # 缓存清理任务 cron 表达式 (默认: 每天凌晨 3:00:00)
+    cache-cleanup-cron: "0 0 3 * * ?"
+
+    # 是否启用全量预计算任务
+    full-precompute-enabled: true
+    # 是否启用增量预计算任务
+    incremental-precompute-enabled: true
+    # 是否启用活跃度预计算任务
+    activity-precompute-enabled: true
+    # 是否启用缓存清理任务
+    cache-cleanup-enabled: true
+
+    # ========== 预计算参数 ==========
+    # 预计算相似度时，每个用户保留的最相似用户数量
+    similarity-top-n: 200
+    # 预计算互补度时，每个用户保留的最互补用户数量
+    complement-top-n: 200
+    # 预计算缓存过期时间（秒，默认: 86400秒 = 24小时）
+    precompute-cache-expire-seconds: 86400
+    # 活跃度计算的时间窗口（天数，默认: 30天）
+    activity-days-window: 30
