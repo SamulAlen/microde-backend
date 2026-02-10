@@ -1,6 +1,8 @@
 package com.samul.microde.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.samul.microde.config.ScheduledConfig;
+import com.samul.microde.constant.RedisCacheConstants;
 import com.samul.microde.model.domain.Team;
 import com.samul.microde.model.domain.User;
 import com.samul.microde.service.CachePreloadService;
@@ -8,6 +10,7 @@ import com.samul.microde.service.TeamService;
 import com.samul.microde.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -15,10 +18,12 @@ import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
  * 缓存预热服务实现
+ * 负责应用启动时预热数据，以及定期同步数据到Redis
  *
  * @author Samul_Alen
  */
@@ -39,6 +44,9 @@ public class CachePreloadServiceImpl implements CachePreloadService {
     @Resource
     private RedisTemplate<String, Object> redisTemplate;
 
+    @Resource
+    private ScheduledConfig scheduledConfig;
+
     /**
      * 应用启动时自动执行预热
      */
@@ -51,6 +59,29 @@ public class CachePreloadServiceImpl implements CachePreloadService {
             log.info("缓存预热完成！");
         } catch (Exception e) {
             log.error("缓存预热失败", e);
+        }
+    }
+
+    /**
+     * 定时执行数据同步
+     * 执行间隔通过 scheduled.tasks.cache-sync-interval 配置（单位：毫秒）
+     * 默认：5分钟 (300000ms)
+     */
+    @Scheduled(fixedRateString = "${scheduled.tasks.cache-sync-interval:300000}")
+    public void scheduledSync() {
+        // 检查任务是否启用
+        if (scheduledConfig != null && !scheduledConfig.getCacheSyncEnabled()) {
+            log.debug("缓存同步任务已禁用，跳过执行");
+            return;
+        }
+
+        log.info("开始执行定时缓存同步任务...");
+        try {
+            syncUsersToRedis();
+            syncTeamsToRedis();
+            log.info("定时缓存同步任务完成");
+        } catch (Exception e) {
+            log.error("定时缓存同步任务执行失败", e);
         }
     }
 
@@ -208,5 +239,64 @@ public class CachePreloadServiceImpl implements CachePreloadService {
     public void syncTeamsToRedis() {
         log.info("开始同步数据库队伍到Redis...");
         preloadAllTeams();
+    }
+
+    /**
+     * 清理过期的预计算缓存
+     * 删除超过配置时间的缓存数据
+     */
+    public void cleanupExpiredPrecomputeCache() {
+        try {
+            int deletedCount = 0;
+
+            // 1. 清理推荐结果缓存 (microde:recommend:*)
+            String recommendPattern = RedisCacheConstants.RECOMMEND_CACHE_KEY_PREFIX + "*";
+            Set<String> recommendKeys = redisTemplate.keys(recommendPattern);
+            if (recommendKeys != null && !recommendKeys.isEmpty()) {
+                long count = redisTemplate.delete(recommendKeys);
+                deletedCount += count;
+                log.info("清理推荐结果缓存: {} 个", count);
+            }
+
+            // 2. 清理用户相似度缓存 (microde:similarity:*)
+            String similarityPattern = "microde:similarity:*";
+            Set<String> similarityKeys = redisTemplate.keys(similarityPattern);
+            if (similarityKeys != null && !similarityKeys.isEmpty()) {
+                long count = redisTemplate.delete(similarityKeys);
+                deletedCount += count;
+                log.info("清理用户相似度缓存: {} 个", count);
+            }
+
+            // 3. 清理用户互补度缓存 (microde:complement:*)
+            String complementPattern = "microde:complement:*";
+            Set<String> complementKeys = redisTemplate.keys(complementPattern);
+            if (complementKeys != null && !complementKeys.isEmpty()) {
+                long count = redisTemplate.delete(complementKeys);
+                deletedCount += count;
+                log.info("清理用户互补度缓存: {} 个", count);
+            }
+
+            // 4. 清理用户搜索缓存 (microde:user:search:*)
+            String searchPattern = "microde:user:search:*";
+            Set<String> searchKeys = redisTemplate.keys(searchPattern);
+            if (searchKeys != null && !searchKeys.isEmpty()) {
+                long count = redisTemplate.delete(searchKeys);
+                deletedCount += count;
+                log.info("清理用户搜索缓存: {} 个", count);
+            }
+
+            // 5. 清理当前用户缓存 (microde:user:current:*) - 这些会在下次登录时重建
+            String currentPattern = "microde:user:current:*";
+            Set<String> currentKeys = redisTemplate.keys(currentPattern);
+            if (currentKeys != null && !currentKeys.isEmpty()) {
+                long count = redisTemplate.delete(currentKeys);
+                deletedCount += count;
+                log.info("清理当前用户缓存: {} 个", count);
+            }
+
+            log.info("预计算缓存清理完成，共清理 {} 个缓存键", deletedCount);
+        } catch (Exception e) {
+            log.error("清理预计算缓存失败", e);
+        }
     }
 }

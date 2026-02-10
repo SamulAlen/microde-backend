@@ -5,8 +5,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Scheduled Tasks Configuration
- * Supports setting execution time and enable status via configuration file
+ * 定时任务配置
+ * 支持通过配置文件设置所有定时任务的执行时间和启用状态
  *
  * @author Samul_Alen
  */
@@ -15,90 +15,90 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "scheduled.tasks")
 public class ScheduledConfig {
 
-    // ========== Cache Sync Task ==========
+    // ========== 缓存同步任务 ==========
     /**
-     * Cache sync task interval (milliseconds)
-     * Default: 5 minutes (300000ms)
+     * 缓存同步任务执行间隔（毫秒）
+     * 默认：5分钟 (300000ms)
      */
     private Long cacheSyncInterval = 300000L;
 
     /**
-     * Whether to enable cache sync task
-     * Default: enabled
+     * 是否启用缓存同步任务
+     * 默认：启用
      */
     private Boolean cacheSyncEnabled = true;
 
-    // ========== Precompute Tasks ==========
+    // ========== 预计算任务 ==========
     /**
-     * Full precompute task cron expression
-     * Default: 2:00:00 AM daily
+     * 全量预计算任务 cron 表达式
+     * 默认：每天凌晨 2:00:00 执行
      */
     private String fullPrecomputeCron = "0 0 2 * * ?";
 
     /**
-     * Incremental precompute task cron expression
-     * Default: every 6 hours
+     * 增量预计算任务 cron 表达式
+     * 默认：每6小时执行一次
      */
     private String incrementalPrecomputeCron = "0 0 */6 * * ?";
 
     /**
-     * Activity precompute task cron expression
-     * Default: every hour
+     * 活跃度预计算任务 cron 表达式
+     * 默认：每小时执行一次
      */
     private String activityPrecomputeCron = "0 0 * * * ?";
 
     /**
-     * Cache cleanup task cron expression
-     * Default: 3:00:00 AM daily
+     * 缓存清理任务 cron 表达式
+     * 默认：每天凌晨 3:00:00 执行
      */
     private String cacheCleanupCron = "0 0 3 * * ?";
 
     /**
-     * Whether to enable full precompute task
-     * Default: enabled
+     * 是否启用全量预计算任务
+     * 默认：启用
      */
     private Boolean fullPrecomputeEnabled = true;
 
     /**
-     * Whether to enable incremental precompute task
-     * Default: enabled
+     * 是否启用增量预计算任务
+     * 默认：启用
      */
     private Boolean incrementalPrecomputeEnabled = true;
 
     /**
-     * Whether to enable activity precompute task
-     * Default: enabled
+     * 是否启用活跃度预计算任务
+     * 默认：启用
      */
     private Boolean activityPrecomputeEnabled = true;
 
     /**
-     * Whether to enable cache cleanup task
-     * Default: enabled
+     * 是否启用缓存清理任务
+     * 默认：启用
      */
     private Boolean cacheCleanupEnabled = true;
 
-    // ========== Precompute Parameters ==========
+    // ========== 预计算参数配置 ==========
     /**
-     * Number of most similar users to keep per user when precomputing similarity
-     * Default: 200
+     * 预计算相似度时，每个用户保留的最相似用户数量
+     * 默认：200
      */
     private Integer similarityTopN = 200;
 
     /**
-     * Number of most complementary users to keep per user when precomputing complement
-     * Default: 200
+     * 预计算互补度时，每个用户保留的最互补用户数量
+     * 默认：200
      */
     private Integer complementTopN = 200;
 
     /**
-     * Cache expiration time for precomputed data (seconds)
-     * Default: 86400 seconds (24 hours)
+     * 预计算时的缓存过期时间（秒）
+     * 默认：86400秒 (24小时)
      */
     private Long precomputeCacheExpireSeconds = 86400L;
 
     /**
-     * Time window for activity score calculation (days)
-     * Default: 30 days
+     * 活跃度计算的时间窗口（天数）
+     * 默认：30天
      */
     private Integer activityDaysWindow = 30;
 }

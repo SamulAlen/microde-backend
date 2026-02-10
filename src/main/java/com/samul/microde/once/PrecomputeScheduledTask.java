@@ -1,15 +1,14 @@
 package com.samul.microde.once;
 
 import com.samul.microde.config.ScheduledConfig;
+import com.samul.microde.service.CachePreloadService;
 import com.samul.microde.service.PrecomputeService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
-import java.util.Set;
 
 /**
  * 预计算定时任务
@@ -29,7 +28,7 @@ public class PrecomputeScheduledTask {
     private ScheduledConfig scheduledConfig;
 
     @Resource
-    private RedisTemplate<String, Object> redisTemplate;
+    private CachePreloadService cachePreloadService;
 
     /**
      * 全量预计算任务
@@ -135,26 +134,14 @@ public class PrecomputeScheduledTask {
         try {
             // 清理过期的预计算缓存
             // 删除超过配置时间的缓存数据
-            cleanupExpiredPrecomputeCache();
+            if (cachePreloadService instanceof com.samul.microde.service.impl.CachePreloadServiceImpl) {
+                ((com.samul.microde.service.impl.CachePreloadServiceImpl) cachePreloadService)
+                    .cleanupExpiredPrecomputeCache();
+            }
 
             log.info("缓存清理任务完成");
         } catch (Exception e) {
             log.error("缓存清理任务执行失败", e);
-        }
-    }
-
-    /**
-     * 清理过期的预计算缓存
-     */
-    private void cleanupExpiredPrecomputeCache() {
-        try {
-            // 这里可以添加更细粒度的缓存清理逻辑
-            // 例如：删除超过30天未活跃用户的预计算数据
-            // 具体实现可以根据业务需求调整
-
-            log.debug("预计算缓存清理完成");
-        } catch (Exception e) {
-            log.error("清理预计算缓存失败", e);
         }
     }
 
