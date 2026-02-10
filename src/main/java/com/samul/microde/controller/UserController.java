@@ -219,7 +219,7 @@ public class UserController {
         }
 
         // 缓存未命中，查询数据库
-        Page<User> userList = userService.searchUserByTags(tagNameList);
+        Page<User> userList = userService.searchUserByTags(tagNameList, pageNum, pageSize);
 
         // 存入缓存，过期时间30秒
         try {
@@ -232,28 +232,6 @@ public class UserController {
         return ResultUtils.success(userList);
     }
 
-    @GetMapping("/recommend")
-    @Operation(summary = "推荐用户", description = "分页获取推荐用户列表")
-    public BaseResponse<Page<User>> recommendUsers(@RequestParam(defaultValue = "12") long pageSize, @RequestParam(defaultValue = "1") long pageNum, HttpServletRequest request){
-        User logininUser = userService.getLogininUser(request);
-        String redisKey = String.format("microde:user:recommend:%s:%s:%s", logininUser.getId(), pageNum, pageSize);
-        ValueOperations valueOperations = redisTemplate.opsForValue();
-        //如果有缓存，直接读取
-        Page<User> userPage = (Page<User>) valueOperations.get(redisKey);
-        if (userPage != null){
-            return ResultUtils.success(userPage);
-        }
-        //无缓存，查数据库
-        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        userPage = userService.page(new Page<>(pageNum, pageSize), queryWrapper);
-        //写缓存,30s过期
-        try {
-            valueOperations.set(redisKey, userPage, 30, TimeUnit.SECONDS);
-        } catch (Exception e){
-            log.error("redis set key error", e);
-        }
-        return ResultUtils.success(userPage);
-    }
 
     /**
      * 智能推荐用户
@@ -435,6 +413,57 @@ public class UserController {
         }
 
         return ResultUtils.success(b);
+    }
+
+    /**
+     * 封禁/解封用户
+     *
+     * @param id 用户ID
+     * @param status 用户状态 0-正常 1-封禁
+     * @param request HTTP请求
+     * @return 是否成功
+     */
+    @PostMapping("/ban")
+    @Operation(summary = "封禁/解封用户", description = "管理员封禁或解封用户")
+    public BaseResponse<Boolean> banUser(@RequestParam Long id, @RequestParam Integer status, HttpServletRequest request) {
+        // 验证管理员权限
+        if (!isAdmin(request)) {
+            throw new BusinessException(ErrorCode.NO_AUTH, "缺少管理员权限");
+        }
+
+        // 验证状态参数
+        if (status == null || (status != 0 && status != 1)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "状态参数错误");
+        }
+
+        // 查询用户是否存在
+        User user = userService.getById(id);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.NULL_ERROR, "用户不存在");
+        }
+
+        // 更新用户状态
+        User updateUser = new User();
+        updateUser.setId(id);
+        updateUser.setUserStatus(status);
+
+        boolean result = userService.updateById(updateUser);
+
+        // 清除缓存
+        try {
+            // 清除当前用户缓存
+            String cacheKey = "microde:user:current:" + id;
+            redisTemplate.delete(cacheKey);
+            log.info("已清除用户{}的缓存", id);
+
+            // 清除用户搜索缓存（所有搜索结果的缓存）
+            redisTemplate.delete(redisTemplate.keys("microde:user:search:*"));
+            log.info("已清除用户搜索缓存");
+        } catch (Exception e) {
+            log.error("清除用户缓存失败", e);
+        }
+
+        return ResultUtils.success(result);
     }
 
     /**

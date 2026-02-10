@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, Row, Col, Pagination, Tag, Badge, Button, Input, Select, Space, message, Radio } from 'antd';
-import { PlusOutlined, TeamOutlined, LockOutlined, EyeInvisibleOutlined, AppstoreOutlined, UserOutlined } from '@ant-design/icons';
+import { PlusOutlined, TeamOutlined, LockOutlined, EyeInvisibleOutlined, AppstoreOutlined, UserOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { history, useModel } from '@umijs/max';
 import { teamServices } from '@/services/team';
 import type { Team, PageResult, TeamStatus } from '@/types';
@@ -10,6 +10,12 @@ const { Option } = Select;
 
 type TeamViewType = 'public' | 'my';
 
+// 检查队伍是否过期
+const isTeamExpired = (team: Team): boolean => {
+  if (!team.expireTime) return false;
+  return new Date(team.expireTime) < new Date();
+};
+
 const TeamCard: React.FC<{ team: Team; memberCount: number; onJoin: (team: Team) => void; onEdit: (teamId: number) => void; onDelete: (teamId: number) => void; canEdit: boolean }> = ({
   team,
   memberCount,
@@ -18,6 +24,9 @@ const TeamCard: React.FC<{ team: Team; memberCount: number; onJoin: (team: Team)
   onDelete,
   canEdit,
 }) => {
+  // 计算是否过期
+  const expired = useMemo(() => isTeamExpired(team), [team]);
+
   const getStatusBadge = (status: number) => {
     const statusMap = {
       0: { text: '公开', color: 'green' },
@@ -39,13 +48,26 @@ const TeamCard: React.FC<{ team: Team; memberCount: number; onJoin: (team: Team)
     }
   };
 
+  // 过期队伍的卡片样式
+  const cardStyle = {
+    marginBottom: 16,
+    height: '100%',
+    position: 'relative' as const,
+    overflow: 'hidden' as const,
+  };
+
   return (
     <Col xs={24} sm={12} md={8} lg={6}>
       <Card
-        hoverable
-        style={{ marginBottom: 16, height: '100%' }}
+        hoverable={!expired}
+        style={cardStyle}
         actions={[
-          <Button type="primary" size="small" onClick={() => history.push(`/team/detail/${team.id}`)}>
+          <Button
+            type="primary"
+            size="small"
+            onClick={() => history.push(`/team/detail/${team.id}`)}
+            disabled={expired && !canEdit}
+          >
             查看
           </Button>,
           canEdit && (
@@ -60,24 +82,55 @@ const TeamCard: React.FC<{ team: Team; memberCount: number; onJoin: (team: Team)
           ),
         ].filter(Boolean)}
       >
-        <Card.Meta
-          avatar={getStatusIcon(team.status)}
-          title={team.name}
-          description={
-            <div>
-              <div>{team.description || '暂无描述'}</div>
-              <div style={{ marginTop: 8 }}>
-                {getStatusBadge(team.status)}
+        {/* 过期队伍的水印 */}
+        {expired && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%) rotate(-30deg)',
+              fontSize: '24px',
+              fontWeight: 'bold',
+              color: 'rgba(255, 0, 0, 0.3)',
+              pointerEvents: 'none',
+              whiteSpace: 'nowrap',
+              zIndex: 1,
+            }}
+          >
+            <ClockCircleOutlined style={{ marginRight: 8 }} />
+            已过期
+          </div>
+        )}
+
+        {/* 过期队伍的内容容器 - 应用变暗效果 */}
+        <div style={expired ? {
+          filter: 'grayscale(100%) brightness(0.7)',
+          opacity: 0.7,
+          position: 'relative',
+          zIndex: 0,
+        } : {}}>
+          <Card.Meta
+            avatar={getStatusIcon(team.status)}
+            title={team.name}
+            description={
+              <div>
+                <div>{team.description || '暂无描述'}</div>
+                <div style={{ marginTop: 8 }}>
+                  {getStatusBadge(team.status)}
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  <Tag>当前人数: {memberCount}/{team.maxNum}</Tag>
+                  {team.expireTime && (
+                    <Tag color={expired ? 'red' : 'default'}>
+                      过期时间: {new Date(team.expireTime).toLocaleDateString()}
+                    </Tag>
+                  )}
+                </div>
               </div>
-              <div style={{ marginTop: 8 }}>
-                <Tag>当前人数: {memberCount}/{team.maxNum}</Tag>
-                {team.expireTime && (
-                  <Tag>过期时间: {new Date(team.expireTime).toLocaleDateString()}</Tag>
-                )}
-              </div>
-            </div>
-          }
-        />
+            }
+          />
+        </div>
       </Card>
     </Col>
   );
@@ -90,7 +143,14 @@ const TeamListPage: React.FC = () => {
   const [memberCounts, setMemberCounts] = useState<Record<number, number>>({});
   const [myTeamMemberCounts, setMyTeamMemberCounts] = useState<Record<number, number>>({});
   const [viewType, setViewType] = useState<TeamViewType>('public');
-  const [pagination, setPagination] = useState({
+  // 公共队伍的分页状态
+  const [publicPagination, setPublicPagination] = useState({
+    current: 1,
+    pageSize: 12,
+    total: 0,
+  });
+  // 我的队伍的分页状态（虽然目前不分页，但保留扩展性）
+  const [myPagination, setMyPagination] = useState({
     current: 1,
     pageSize: 12,
     total: 0,
@@ -190,6 +250,11 @@ const TeamListPage: React.FC = () => {
         const myTeams = teamsWithMembership.filter(team => team.userId === currentUser?.id || team.hasJoined);
 
         setMyTeams(myTeams);
+        setMyPagination({
+          current: 1,
+          pageSize: myTeams.length,
+          total: myTeams.length,
+        });
         fetchMyTeamMemberCounts(myTeams);
       }
     } catch (error) {
@@ -214,11 +279,6 @@ const TeamListPage: React.FC = () => {
         const pageResult = res.data as PageResult<Team>;
         let teams = pageResult.records || [];
 
-        // 非管理员用户过滤掉私密队伍（status = 1）
-        if (!isAdmin) {
-          teams = teams.filter(team => team.status !== 1);
-        }
-
         // 对于公共队伍视图，过滤掉自己创建的和已加入的队伍
         if (viewType === 'public') {
           // 获取已加入的队伍信息
@@ -237,18 +297,29 @@ const TeamListPage: React.FC = () => {
             })
           );
 
-          // 过滤掉自己创建的和已加入的
-          teams = teamsWithMembership.filter(
-            team => team.userId !== currentUser?.id && !team.hasJoined
-          );
-        }
+          // 过滤：去掉私密队伍（非管理员）和自己创建的/已加入的
+          teams = teamsWithMembership.filter(team => {
+            // 非管理员用户过滤掉私密队伍（status = 1）
+            if (!isAdmin && team.status === 1) {
+              return false;
+            }
+            // 过滤掉自己创建的和已加入的
+            return team.userId !== currentUser?.id && !team.hasJoined;
+          });
 
-        setTeams(teams);
-        setPagination({
-          current: pageResult.current || page,
-          pageSize: pageResult.size || pageSize,
-          total: pageResult.total || 0,
-        });
+          // 计算过滤后的实际总数
+          // 由于后端返回的是原始总数，我们需要估算过滤后的总数
+          // 如果当前页的数据被过滤了很多，说明总数据也会被过滤很多
+          const filterRatio = teams.length / (pageResult.records?.length || 1);
+          const estimatedTotal = Math.round((pageResult.total || 0) * filterRatio);
+
+          setTeams(teams);
+          setPublicPagination({
+            current: pageResult.current || page,
+            pageSize: pageResult.size || pageSize,
+            total: estimatedTotal,
+          });
+        }
 
         // 获取队伍成员数量
         fetchTeamMemberCounts(teams);
@@ -263,7 +334,7 @@ const TeamListPage: React.FC = () => {
 
   useEffect(() => {
     if (viewType === 'public') {
-      fetchTeams(1, pagination.pageSize);
+      fetchTeams(1, publicPagination.pageSize);
     } else {
       fetchMyTeams();
     }
@@ -287,7 +358,7 @@ const TeamListPage: React.FC = () => {
       if (res.code === 0) {
         message.success('删除成功');
         if (viewType === 'public') {
-          fetchTeams(pagination.current, pagination.pageSize);
+          fetchTeams(publicPagination.current, publicPagination.pageSize);
         } else {
           fetchMyTeams();
         }
@@ -305,9 +376,10 @@ const TeamListPage: React.FC = () => {
     setViewType(e.target.value);
   };
 
-  // 根据视图类型选择要显示的队伍
+  // 根据视图类型选择要显示的队伍和分页
   const displayTeams = viewType === 'public' ? teams : myTeams;
   const displayMemberCounts = viewType === 'public' ? memberCounts : myTeamMemberCounts;
+  const displayPagination = viewType === 'public' ? publicPagination : myPagination;
 
   return (
     <Card
@@ -370,9 +442,9 @@ const TeamListPage: React.FC = () => {
           {viewType === 'public' && (
             <div style={{ marginTop: 24, textAlign: 'center' }}>
               <Pagination
-                current={pagination.current}
-                pageSize={pagination.pageSize}
-                total={pagination.total}
+                current={publicPagination.current}
+                pageSize={publicPagination.pageSize}
+                total={publicPagination.total}
                 onChange={handlePageChange}
                 showSizeChanger
                 showQuickJumper

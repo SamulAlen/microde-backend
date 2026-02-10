@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Table, Input, Button, Space, Modal, message, Tag, Avatar } from 'antd';
-import { UserOutlined, SearchOutlined, DeleteOutlined } from '@ant-design/icons';
+import { UserOutlined, SearchOutlined, DeleteOutlined, StopOutlined, CheckOutlined } from '@ant-design/icons';
 import { userServices } from '@/services/user';
 import type { User } from '@/types';
 
@@ -47,6 +47,27 @@ const AdminUserManagementPage: React.FC = () => {
           }
         } catch (error) {
           message.error('删除失败');
+        }
+      },
+    });
+  };
+
+  const handleBan = (user: User) => {
+    const isBanned = user.userStatus === 1;
+    Modal.confirm({
+      title: isBanned ? '解封用户' : '封禁用户',
+      content: `确定要${isBanned ? '解封' : '封禁'}用户 "${user.username || user.userAccount}" 吗？`,
+      onOk: async () => {
+        try {
+          // 0 表示正常（解封），1 表示封禁
+          const newStatus = isBanned ? 0 : 1;
+          const res = await userServices.banUser(user.id, newStatus);
+          if (res.code === 0) {
+            message.success(`${isBanned ? '解封' : '封禁'}成功`);
+            fetchUsers(searchText || undefined);
+          }
+        } catch (error) {
+          message.error(`${isBanned ? '解封' : '封禁'}失败`);
         }
       },
     });
@@ -151,17 +172,28 @@ const AdminUserManagementPage: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      width: 120,
+      width: 180,
       fixed: 'right' as const,
       render: (_: any, record: User) => (
-        <Button
-          danger
-          icon={<DeleteOutlined />}
-          size="small"
-          onClick={() => handleDelete(record)}
-        >
-          删除
-        </Button>
+        <Space>
+          <Button
+            danger={record.userStatus !== 1}
+            type={record.userStatus === 1 ? 'primary' : 'default'}
+            icon={record.userStatus === 1 ? <CheckOutlined /> : <StopOutlined />}
+            size="small"
+            onClick={() => handleBan(record)}
+          >
+            {record.userStatus === 1 ? '解封' : '封禁'}
+          </Button>
+          <Button
+            danger
+            icon={<DeleteOutlined />}
+            size="small"
+            onClick={() => handleDelete(record)}
+          >
+            删除
+          </Button>
+        </Space>
       ),
     },
   ];

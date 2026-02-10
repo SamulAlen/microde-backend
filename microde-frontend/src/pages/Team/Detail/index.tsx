@@ -154,6 +154,9 @@ const TeamDetailPage: React.FC = () => {
 
   const isTeamLeader = currentUser && currentUser.id === team.userId;
 
+  // 从成员列表中找到创建者
+  const creator = members.find(member => member.id === team.userId);
+
   return (
     <Card
       title={team.name}
@@ -179,7 +182,7 @@ const TeamDetailPage: React.FC = () => {
           {team.expireTime ? new Date(team.expireTime).toLocaleString() : '永不过期'}
         </Descriptions.Item>
         <Descriptions.Item label="创建者">
-          {team.userId === currentUser?.id ? '你' : `用户 ID: ${team.userId}`}
+          {team.userId === currentUser?.id ? '你' : (creator?.username || creator?.userAccount || '未知')}
         </Descriptions.Item>
         <Descriptions.Item label="创建时间" span={2}>
           {new Date(team.createTime).toLocaleString()}

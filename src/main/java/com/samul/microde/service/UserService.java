@@ -58,9 +58,11 @@ public interface UserService extends IService<User> {
      * 根据标签搜索用户
      *
      * @param tagNameList
+     * @param pageNum
+     * @param pageSize
      * @return
      */
-    Page<User> searchUserByTags(List<String> tagNameList);
+    Page<User> searchUserByTags(List<String> tagNameList, long pageNum, long pageSize);
 
     /**
      *  用户信息修改

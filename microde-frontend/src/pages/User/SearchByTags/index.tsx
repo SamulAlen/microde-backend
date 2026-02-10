@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Card, Row, Col, Pagination, Tag, Avatar, Empty, Spin, message, Button, Input } from 'antd';
 import { UserOutlined, PlusOutlined } from '@ant-design/icons';
 import { userServices } from '@/services/user';
@@ -50,23 +50,32 @@ const SearchByTagsPage: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
   const inputRef = useRef<any>(null);
+  // 使用 ref 保存最新的标签列表，避免闭包陷阱
+  const selectedTagsRef = useRef<string[]>([]);
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 12,
     total: 0,
   });
 
+  // 更新 ref 当 selectedTags 变化时
+  selectedTagsRef.current = selectedTags;
+
   const fetchUsers = async (page: number, pageSize: number, tagNameList?: string[]) => {
     setLoading(true);
     try {
+      console.log('fetchUsers called with:', { page, pageSize, tagNameList });
       const res = await userServices.searchUsersByTags({
         pageNum: page,
         pageSize: pageSize,
         tagNameList,
       });
 
+      console.log('API response:', res);
+
       if (res.code === 0 && res.data) {
         const pageResult = res.data as PageResult<User>;
+        console.log('Page result:', pageResult);
         setUsers(pageResult.records || []);
         setPagination({
           current: pageResult.current || page,
@@ -74,6 +83,7 @@ const SearchByTagsPage: React.FC = () => {
           total: pageResult.total || 0,
         });
       } else {
+        console.error('API error:', res);
         message.error(res.message || '搜索失败');
       }
     } catch (error) {
@@ -90,11 +100,25 @@ const SearchByTagsPage: React.FC = () => {
       setSelectedTags([...selectedTags, trimmedValue]);
     }
     setInputValue('');
-    inputRef.current?.focus();
+    // 移除 focus() 调用，避免干扰用户操作分页
+    // inputRef.current?.focus();
   };
 
   const handleTagClose = (removedTag: string) => {
-    setSelectedTags(selectedTags.filter(tag => tag !== removedTag));
+    const newTags = selectedTags.filter(tag => tag !== removedTag);
+    setSelectedTags(newTags);
+    // 如果还有标签，自动重新搜索；否则清空结果
+    if (newTags.length > 0) {
+      fetchUsers(1, pagination.pageSize, newTags);
+    } else {
+      setUsers([]);
+      setHasSearched(false);
+      setPagination({
+        current: 1,
+        pageSize: 12,
+        total: 0,
+      });
+    }
   };
 
   const handleSearch = () => {
@@ -118,9 +142,13 @@ const SearchByTagsPage: React.FC = () => {
     });
   };
 
-  const handlePageChange = (page: number, pageSize: number) => {
-    fetchUsers(page, pageSize, selectedTags.length > 0 ? selectedTags : undefined);
-  };
+  // 使用 useCallback 并且从 ref 读取最新的 selectedTags
+  const handlePageChange = useCallback((page: number, pageSize: number) => {
+    console.log('handlePageChange called with:', { page, pageSize });
+    const currentTags = selectedTagsRef.current;
+    console.log('currentTags from ref:', currentTags);
+    fetchUsers(page, pageSize, currentTags.length > 0 ? currentTags : undefined);
+  }, []);
 
   return (
     <Card title="按标签搜索用户">
@@ -146,8 +174,10 @@ const SearchByTagsPage: React.FC = () => {
             style={{ width: 150 }}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onBlur={handleInputConfirm}
-            onPressEnter={handleInputConfirm}
+            onPressEnter={(e) => {
+              e.preventDefault();
+              handleInputConfirm();
+            }}
             placeholder="输入标签后按回车"
             prefix={<PlusOutlined />}
           />

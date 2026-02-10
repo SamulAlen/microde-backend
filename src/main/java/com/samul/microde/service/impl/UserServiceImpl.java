@@ -258,10 +258,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      * 根据标签搜索用户(内存过滤）
      *
      * @param tagNameList 用户要拥有的标签
+     * @param pageNum 页码
+     * @param pageSize 页大小
      * @return
      */
     @Override
-    public Page<User> searchUserByTags(List<String> tagNameList) {
+    public Page<User> searchUserByTags(List<String> tagNameList, long pageNum, long pageSize) {
         if (CollectionUtils.isEmpty(tagNameList)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -304,8 +306,25 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             }
             return true;
         }).map(this::getSafetyUser).collect(Collectors.toList());
-        Page<User> userSearchPage = new Page<>();
-        return userSearchPage.setRecords(userRecordList);
+
+        // 3. 分页处理
+        int fromIndex = (int) ((pageNum - 1) * pageSize);
+        int toIndex = (int) Math.min(pageNum * pageSize, userRecordList.size());
+
+        if (fromIndex >= userRecordList.size()) {
+            // 页码超出范围，返回空结果
+            Page<User> userSearchPage = new Page<>(pageNum, pageSize);
+            userSearchPage.setRecords(userRecordList);
+            userSearchPage.setTotal(userRecordList.size());
+            return userSearchPage;
+        }
+
+        List<User> pagedList = userRecordList.subList(fromIndex, toIndex);
+
+        Page<User> userSearchPage = new Page<>(pageNum, pageSize);
+        userSearchPage.setRecords(pagedList);
+        userSearchPage.setTotal(userRecordList.size());
+        return userSearchPage;
     }
 
     /**

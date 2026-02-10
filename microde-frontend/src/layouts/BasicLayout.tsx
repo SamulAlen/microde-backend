@@ -109,11 +109,6 @@ export default function BasicLayout() {
             label: '智能推荐',
           },
           {
-            key: '/user/recommend',
-            icon: <LikeOutlined />,
-            label: '推荐用户',
-          },
-          {
             key: '/user/tags',
             icon: <TagsOutlined />,
             label: '标签搜索',

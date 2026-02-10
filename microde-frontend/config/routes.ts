@@ -44,12 +44,6 @@ export default [
             component: './User/SmartRecommend',
           },
           {
-            path: '/user/recommend',
-            name: 'recommend',
-            icon: 'like',
-            component: './User/Recommend',
-          },
-          {
             path: '/user/tags',
             name: 'searchByTags',
             icon: 'tags',

@@ -82,19 +82,6 @@ export const userServices = {
     });
   },
 
-  /**
-   * GET /user/recommend (line 157)
-   * Get recommended users with pagination
-   */
-  recommendUsers: (params: {
-    pageSize: number;
-    pageNum: number;
-  }): Promise<BaseResponse<PageResult<User>>> => {
-    return request('/user/recommend', {
-      method: 'GET',
-      params,
-    });
-  },
 
   /**
    * POST /user/update (line 179)
@@ -168,6 +155,17 @@ export const userServices = {
     return request('/user/tags/update', {
       method: 'POST',
       data: tags,
+    });
+  },
+
+  /**
+   * POST /user/ban
+   * Ban or unban user (Admin only)
+   */
+  banUser: (id: number, status: number): Promise<BaseResponse<boolean>> => {
+    return request('/user/ban', {
+      method: 'POST',
+      params: { id, status },
     });
   },
 };
