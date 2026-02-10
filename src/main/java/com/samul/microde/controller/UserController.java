@@ -17,6 +17,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.util.CollectionUtils;
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -51,6 +54,9 @@ public class UserController {
 
     @Resource
     private RecommendationService recommendationService;
+
+    @Resource
+    private RedissonClient redissonClient;
 
     /**
      * 用户注册
@@ -449,18 +455,62 @@ public class UserController {
 
         boolean result = userService.updateById(updateUser);
 
-        // 清除缓存
+        // 清除缓存（使用分布式锁防止并发问题）
+        RLock lock = redissonClient.getLock("microde:lock:user:cache:cleanup:" + id);
         try {
-            // 清除当前用户缓存
-            String cacheKey = "microde:user:current:" + id;
-            redisTemplate.delete(cacheKey);
-            log.info("已清除用户{}的缓存", id);
+            if (lock.tryLock(0, 10, TimeUnit.SECONDS)) {
+                try {
+                    // 1. 清除当前用户缓存
+                    String currentUserCacheKey = "microde:user:current:" + id;
+                    redisTemplate.delete(currentUserCacheKey);
+                    log.info("已清除用户{}的当前用户缓存", id);
 
-            // 清除用户搜索缓存（所有搜索结果的缓存）
-            redisTemplate.delete(redisTemplate.keys("microde:user:search:*"));
-            log.info("已清除用户搜索缓存");
-        } catch (Exception e) {
-            log.error("清除用户缓存失败", e);
+                    // 2. 清除与该用户相关的推荐缓存
+                    // 获取所有推荐缓存key并精确匹配删除
+                    Set<String> recommendKeys = redisTemplate.keys("microde:recommend:*");
+                    if (recommendKeys != null && !recommendKeys.isEmpty()) {
+                        // 只删除与该用户相关的推荐缓存（key中包含用户ID）
+                        long deletedCount = recommendKeys.stream()
+                                .filter(key -> key.contains(String.valueOf(id)))
+                                .peek(key -> redisTemplate.delete(key))
+                                .count();
+                        log.info("已清除用户{}的推荐缓存，共{}个", id, deletedCount);
+                    }
+
+                    // 3. 清除与该用户相关的搜索缓存
+                    Set<String> searchKeys = redisTemplate.keys("microde:user:search:*");
+                    if (searchKeys != null && !searchKeys.isEmpty()) {
+                        long deletedCount = searchKeys.stream()
+                                .filter(key -> {
+                                    // 搜索缓存的key格式通常是 search:tags:xxx 或类似格式
+                                    // 我们无法直接判断某个搜索结果是否包含该用户
+                                    // 所以只能删除所有搜索缓存，让下次搜索重新计算
+                                    return true;
+                                })
+                                .peek(key -> redisTemplate.delete(key))
+                                .count();
+                        log.info("已清除用户搜索缓存，共{}个", deletedCount);
+                    }
+
+                    // 4. 清除与该用户相关的相似度和互补度缓存
+                    String similarityKey = "microde:similarity:" + id;
+                    String complementKey = "microde:complement:" + id;
+                    redisTemplate.delete(similarityKey);
+                    redisTemplate.delete(complementKey);
+                    log.info("已清除用户{}的相似度和互补度缓存", id);
+                } catch (Exception e) {
+                    log.error("清除用户缓存失败", e);
+                }
+            } else {
+                log.warn("获取用户缓存清理锁超时，可能有其他管理员正在操作该用户");
+            }
+        } catch (InterruptedException e) {
+            log.warn("获取用户缓存清理锁时被中断", e);
+            Thread.currentThread().interrupt();
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
         }
 
         return ResultUtils.success(result);

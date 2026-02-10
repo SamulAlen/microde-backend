@@ -9,6 +9,8 @@ import com.samul.microde.service.CachePreloadService;
 import com.samul.microde.service.TeamService;
 import com.samul.microde.service.UserService;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,15 @@ public class CachePreloadServiceImpl implements CachePreloadService {
     private static final String ALL_TEAMS_CACHE_KEY = "microde:teams:all";
     private static final long CACHE_EXPIRE_MINUTES = 10; // 缓存10分钟
 
+    // 分布式锁的 key 前缀
+    private static final String LOCK_KEY_PREFIX = "microde:lock:";
+
+    // 锁的等待时间（毫秒）- 0表示不等待
+    private static final long LOCK_WAIT_TIME = 0;
+
+    // 锁的自动释放时间（毫秒）- -1表示使用看门狗机制自动续期
+    private static final long LOCK_LEASE_TIME = -1;
+
     @Resource
     private UserService userService;
 
@@ -46,6 +57,9 @@ public class CachePreloadServiceImpl implements CachePreloadService {
 
     @Resource
     private ScheduledConfig scheduledConfig;
+
+    @Resource
+    private RedissonClient redissonClient;
 
     /**
      * 应用启动时自动执行预热
@@ -66,6 +80,7 @@ public class CachePreloadServiceImpl implements CachePreloadService {
      * 定时执行数据同步
      * 执行间隔通过 scheduled.tasks.cache-sync-interval 配置（单位：毫秒）
      * 默认：5分钟 (300000ms)
+     * 使用分布式锁防止多实例同时执行
      */
     @Scheduled(fixedRateString = "${scheduled.tasks.cache-sync-interval:300000}")
     public void scheduledSync() {
@@ -75,13 +90,28 @@ public class CachePreloadServiceImpl implements CachePreloadService {
             return;
         }
 
-        log.info("开始执行定时缓存同步任务...");
+        RLock lock = redissonClient.getLock(LOCK_KEY_PREFIX + "cache:sync");
         try {
-            syncUsersToRedis();
-            syncTeamsToRedis();
-            log.info("定时缓存同步任务完成");
-        } catch (Exception e) {
-            log.error("定时缓存同步任务执行失败", e);
+            if (lock.tryLock(LOCK_WAIT_TIME, LOCK_LEASE_TIME, TimeUnit.MILLISECONDS)) {
+                log.info("成功获取缓存同步锁，开始执行定时缓存同步任务...");
+                try {
+                    syncUsersToRedis();
+                    syncTeamsToRedis();
+                    log.info("定时缓存同步任务完成");
+                } catch (Exception e) {
+                    log.error("定时缓存同步任务执行失败", e);
+                }
+            } else {
+                log.info("缓存同步任务已在其他实例执行，跳过本次执行");
+            }
+        } catch (InterruptedException e) {
+            log.warn("获取缓存同步锁时被中断", e);
+            Thread.currentThread().interrupt();
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+                log.info("释放缓存同步锁");
+            }
         }
     }
 
