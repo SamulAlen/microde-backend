@@ -80,7 +80,8 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         }
         //  f. 超时时间 > 当前时间
         Date expireTime = team.getExpireTime();
-        if (new Date().after(expireTime)) {
+        // 如果设置了过期时间，检查是否已过期
+        if (expireTime != null && new Date().after(expireTime)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "超时时间 > 当前时间");
         }
         //  g. 校验用户最多创建 5 个队伍

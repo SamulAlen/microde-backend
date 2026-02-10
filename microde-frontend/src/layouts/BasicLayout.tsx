@@ -263,14 +263,12 @@ export default function BasicLayout() {
             {currentUser ? (
               <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
                 <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Badge dot>
-                    <Avatar
-                      size={32}
-                      src={currentUser.avatarUrl}
-                      icon={<UserOutlined />}
-                      style={{ backgroundColor: '#1890ff' }}
-                    />
-                  </Badge>
+                  <Avatar
+                    size={32}
+                    src={currentUser.avatarUrl}
+                    icon={<UserOutlined />}
+                    style={{ backgroundColor: '#1890ff' }}
+                  />
                   <span style={{ fontSize: 14 }}>{currentUser.username || '用户'}</span>
                 </div>
               </Dropdown>

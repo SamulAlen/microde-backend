@@ -227,6 +227,11 @@ const TeamListPage: React.FC = () => {
           if (!isAdmin && team.status === 1) {
             return false;
           }
+          // 非管理员用户过滤掉已过期的队伍（在自己的队伍中仍然显示自己创建的过期队伍）
+          const expired = isTeamExpired(team);
+          if (!isAdmin && expired && team.userId !== currentUser?.id) {
+            return false;
+          }
           return true; // 其他队伍需要检查是否已加入（通过成员数量判断）
         });
 
@@ -297,8 +302,13 @@ const TeamListPage: React.FC = () => {
             })
           );
 
-          // 过滤：去掉私密队伍（非管理员）和自己创建的/已加入的
+          // 过滤：去掉过期队伍（非管理员）、私密队伍（非管理员）和自己创建的/已加入的
           teams = teamsWithMembership.filter(team => {
+            // 非管理员用户过滤掉过期的队伍
+            const expired = isTeamExpired(team);
+            if (!isAdmin && expired) {
+              return false;
+            }
             // 非管理员用户过滤掉私密队伍（status = 1）
             if (!isAdmin && team.status === 1) {
               return false;
