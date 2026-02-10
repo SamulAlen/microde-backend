@@ -1,4 +1,4 @@
-package com.samul.microde.once;
+package com.samul.microde.job;
 
 import com.samul.microde.config.ScheduledConfig;
 import com.samul.microde.service.CachePreloadService;

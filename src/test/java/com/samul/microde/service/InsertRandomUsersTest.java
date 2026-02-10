@@ -53,6 +53,9 @@ public class InsertRandomUsersTest {
     @Resource
     private UserMapper userMapper;
 
+    // 已存在的账户名集合，用于避免重复
+    private static final java.util.Set<String> EXISTING_ACCOUNTS = new java.util.HashSet<>();
+
     /**
      * 插入500个随机用户
      * 在IDEA中右键点击此方法，选择运行
@@ -66,6 +69,11 @@ public class InsertRandomUsersTest {
         System.out.println("开始插入 " + INSERT_USER_COUNT + " 个随机用户...");
 
         Random random = new Random();
+        int successCount = 0;
+        int failCount = 0;
+
+        // 清空已存在账户集合
+        EXISTING_ACCOUNTS.clear();
 
         for (int i = 0; i < INSERT_USER_COUNT; i++) {
             try {
@@ -75,8 +83,8 @@ public class InsertRandomUsersTest {
                 String username = generateRandomName(random);
                 user.setUsername(username);
 
-                // 生成随机账户名
-                String userAccount = generateRandomAccount(username, random);
+                // 生成随机账户名（确保不重复）
+                String userAccount = generateUniqueAccount(random);
                 user.setUserAccount(userAccount);
 
                 // 加密密码（统一为12345678）
@@ -106,19 +114,29 @@ public class InsertRandomUsersTest {
                 user.setUserStatus(0); // 正常
                 user.setUserRole(0);   // 普通用户
 
-                userMapper.insert(user);
+                int result = userMapper.insert(user);
 
-                if ((i + 1) % 50 == 0) {
-                    System.out.println("已插入 " + (i + 1) + " 个用户...");
+                if (result > 0) {
+                    successCount++;
+                    if (successCount % 50 == 0) {
+                        System.out.println("已成功插入 " + successCount + " 个用户...");
+                    }
+                } else {
+                    failCount++;
+                    System.err.println("插入第 " + (i + 1) + " 个用户失败，insert 返回 0");
                 }
             } catch (Exception e) {
-                System.err.println("插入第 " + (i + 1) + " 个用户时出错: " + e.getMessage());
-                e.printStackTrace();
+                failCount++;
+                System.err.println("插入第 " + (i + 1) + " 个用户时出错: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+                // 打印堆栈信息以便调试
+                if (failCount <= 5) {
+                    e.printStackTrace();
+                }
             }
         }
 
         stopWatch.stop();
-        System.out.println("插入完成！共插入 " + INSERT_USER_COUNT + " 个用户");
+        System.out.println("插入完成！成功: " + successCount + ", 失败: " + failCount);
         System.out.println("耗时: " + stopWatch.getTotalTimeMillis() + " ms");
         System.out.println("所有用户密码统一为: 12345678");
     }
@@ -140,8 +158,34 @@ public class InsertRandomUsersTest {
     }
 
     /**
-     * 生成随机账户名
+     * 生成唯一的随机账户名
      */
+    private String generateUniqueAccount(Random random) {
+        String[] pinyin = {"user", "dev", "coder", "programmer", "java", "python", "web", "app", "tech", "data"};
+        String prefix = pinyin[random.nextInt(pinyin.length)];
+
+        // 使用时间戳和随机数组合，确保唯一性
+        long timestamp = System.currentTimeMillis();
+        int randomNum = random.nextInt(10000);
+        String account = prefix + timestamp + randomNum;
+
+        // 双重检查：如果仍然重复（极低概率），再次生成
+        int maxAttempts = 10;
+        int attempts = 0;
+        while (EXISTING_ACCOUNTS.contains(account) && attempts < maxAttempts) {
+            randomNum = random.nextInt(10000);
+            account = prefix + timestamp + randomNum + attempts;
+            attempts++;
+        }
+
+        EXISTING_ACCOUNTS.add(account);
+        return account;
+    }
+
+    /**
+     * 生成随机账户名（已废弃，使用 generateUniqueAccount 替代）
+     */
+    @Deprecated
     private String generateRandomAccount(String username, Random random) {
         // 使用拼音+数字的组合
         String[] pinyin = {"user", "dev", "coder", "programmer", "java", "python", "web", "app", "tech", "data"};
